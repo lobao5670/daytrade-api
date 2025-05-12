@@ -3,14 +3,13 @@ import ta
 import requests
 
 def obter_tickers_b3():
-    url = "https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy/CompanyCall/GetInitialCompanies/true"
     try:
-        response = requests.get(url)
+        response = requests.get("https://brapi.dev/api/quote/list")
         data = response.json()
-        tickers = [empresa['stockCode'] + '.SA' for empresa in data['companies']]
+        tickers = [item['stock'] + '.SA' for item in data['stocks']]
         return tickers
     except Exception as e:
-        print("Erro ao obter os tickers da B3:", e)
+        print("Erro ao obter os tickers da brapi.dev:", e)
         return []
 
 def analisar_ativos(tickers=None):
@@ -21,17 +20,20 @@ def analisar_ativos(tickers=None):
 
     for ticker in tickers:
         try:
-            df = yf.download(ticker, period='1d', interval='5m', progress=False)
+            df = yf.download(ticker, period='1d', interval='5m', auto_adjust=True, progress=False)
             if df.empty:
                 continue
 
+            df.columns = df.columns.droplevel(1)
             df.dropna(inplace=True)
-            df['rsi'] = ta.momentum.RSIIndicator(df['Close']).rsi()
-            df['ma_fast'] = ta.trend.SMAIndicator(df['Close'], window=9).sma_indicator()
-            df['ma_slow'] = ta.trend.SMAIndicator(df['Close'], window=21).sma_indicator()
-            macd = ta.trend.MACD(df['Close'])
-            df['macd_diff'] = macd.macd_diff()
-
+            # Garante que 'Close' é uma série unidimensional
+            close_series = df['Close']
+            # Calcula os indicadores
+            df['rsi'] = ta.momentum.RSIIndicator(close=close_series).rsi()
+            df['ma_fast'] = ta.trend.SMAIndicator(close=close_series, window=9).sma_indicator()
+            df['ma_slow'] = ta.trend.SMAIndicator(close=close_series, window=21).sma_indicator()
+            df['macd_diff'] = ta.trend.MACD(close=close_series).macd_diff()
+            
             ultimo = df.iloc[-1]
             cond_compra = (
                 ultimo['ma_fast'] > ultimo['ma_slow'] and
@@ -52,7 +54,8 @@ def analisar_ativos(tickers=None):
                 'macd': round(ultimo['macd_diff'], 4),
                 'sinal': sinal
             })
-        except:
+        except Exception as e:
+            print(e)
             continue
 
     return resultados
