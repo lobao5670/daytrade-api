@@ -7,7 +7,7 @@ def obter_tickers_b3():
         response = requests.get("https://brapi.dev/api/quote/list")
         data = response.json()
         tickers = [item['stock'] + '.SA' for item in data['stocks']]
-        return tickers
+        return tickers[0:30]
     except Exception as e:
         print("Erro ao obter os tickers da brapi.dev:", e)
         return []
@@ -33,7 +33,7 @@ def analisar_ativos(tickers=None):
             df['ma_fast'] = ta.trend.SMAIndicator(close=close_series, window=9).sma_indicator()
             df['ma_slow'] = ta.trend.SMAIndicator(close=close_series, window=21).sma_indicator()
             df['macd_diff'] = ta.trend.MACD(close=close_series).macd_diff()
-            
+
             ultimo = df.iloc[-1]
             cond_compra = (
                 ultimo['ma_fast'] > ultimo['ma_slow'] and
